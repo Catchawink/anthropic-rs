@@ -8,7 +8,7 @@ use tokio_stream::{Stream, StreamExt};
 
 use crate::config::AnthropicConfig;
 use crate::error::{map_deserialization_error, AnthropicError, WrappedError};
-use crate::types::{CompleteRequest, CompleteResponse, CompleteResponseStream};
+use crate::types::{CompleteRequest, CompleteResponse, CompleteResponseStream, CreateMessageRequest, CreateMessageResponse, CreateMessageResponseStream};
 use crate::{
     API_VERSION, API_VERSION_HEADER_KEY, AUTHORIZATION_HEADER_KEY, CLIENT_ID, CLIENT_ID_HEADER_KEY, DEFAULT_API_BASE,
     DEFAULT_MODEL,
@@ -35,6 +35,21 @@ pub struct Client {
 }
 
 impl Client {
+
+    pub async fn create_message(&self, request: CreateMessageRequest) -> Result<CreateMessageResponse, AnthropicError> {
+        if request.stream {
+            return Err(AnthropicError::InvalidArgument("When stream is true, use create_message_stream() instead".into()));
+        }
+        self.post("/v1/complete", request).await
+    }
+
+    pub async fn create_message_stream(&self, request: CreateMessageRequest) -> Result<CreateMessageResponseStream, AnthropicError> {
+        if request.stream {
+            return Err(AnthropicError::InvalidArgument("When stream is true, use create_message_stream() instead".into()));
+        }
+        Ok(self.post_stream("/v1/complete", request).await)
+    }
+
     /// Send a completion request.
     /// # Arguments
     /// * `request` - The completion request.
