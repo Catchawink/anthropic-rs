@@ -241,40 +241,45 @@ where
 {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
-    tokio::spawn(async move {
-        while let Some(ev) = event_source.next().await {
-            match ev {
-                Ok(event) => match event {
-                    Event::Open => continue,
-                    Event::Message(message) => {
-                        match message.event.as_ref() {
-                            "ping" => continue,
-                            "completion" => {
-                                let response = match serde_json::from_str::<O>(&message.data) {
-                                    Ok(output) => Ok(output),
-                                    Err(e) => Err(map_deserialization_error(e, message.data.as_bytes())),
-                                };
+    // TODO: Uncomment
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        tokio::spawn(async move {
+            while let Some(ev) = event_source.next().await {
+                match ev {
+                    Ok(event) => match event {
+                        Event::Open => continue,
+                        Event::Message(message) => {
+                            match message.event.as_ref() {
+                                "ping" => continue,
+                                "completion" => {
+                                    let response = match serde_json::from_str::<O>(&message.data) {
+                                        Ok(output) => Ok(output),
+                                        Err(e) => Err(map_deserialization_error(e, message.data.as_bytes())),
+                                    };
 
-                                if let Err(_e) = tx.send(response) {
-                                    // rx dropped
-                                    break;
+                                    if let Err(_e) = tx.send(response) {
+                                        // rx dropped
+                                        break;
+                                    }
                                 }
+                                _ => continue,
                             }
-                            _ => continue,
                         }
-                    }
-                },
-                Err(e) => {
-                    if let Err(_e) = tx.send(Err(AnthropicError::StreamError(e.to_string()))) {
-                        // rx dropped
-                        break;
+                    },
+                    Err(e) => {
+                        if let Err(_e) = tx.send(Err(AnthropicError::StreamError(e.to_string()))) {
+                            // rx dropped
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        event_source.close();
-    });
+            event_source.close();
+        });
+    }
+    
 
     Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
 }
